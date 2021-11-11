@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Angler Fish in London</title>
+  </head>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+   integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+   crossorigin=""/>
+   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+   integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+   crossorigin=""></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.1.3/pixi.min.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/leaflet-pixi-overlay@1.8.2/L.PixiOverlay.min.js"></script>
+
+  <style>
+    #mapid {
+      height: 500px;
+      width: 700px;
+    }
+  </style>
+  <body>
+    <div id="mapid"></div>
+
+    <script type="text/javascript">
+      //Making the map
+      var mymap = L.map("mapid").setView([51.505, -0.09], 13);
+  
+      L.tileLayer(
+        "https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}",
+        {
+          attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+          maxZoom: 18,
+          id: 'mapbox/streets-v11',
+          tileSize: 512,
+          zoomOffset: -1,
+          accessToken: 'put your access token in here'
+        }
+      ).addTo(mymap);
+
+      // Make pixi app, add stuff
+      var loader = new PIXI.Loader();
+      let app = new PIXI.Application();
+      let fish, state, pixiOverlay;
+      loader.add("fish", "https://2.bp.blogspot.com/-N_scw4TW-fU/WJLOGJ0gx-I/AAAAAAABBcM/mqKaZh2UXS0GAomDbCozsdSV7uPN-xZSACLcB/s400/fish_biwaankou.png");
+      loader.load(setup);
+
+      //run after load
+      function setup(loader, resources) {
+        let firstDraw = true;
+        //initial coords
+        var fishLatLng = [51.505, -0.09];
+
+        //Get keyboard
+        let left = keyboard("j");
+        let right = keyboard("l");
+        let up = keyboard("i");
+        let down = keyboard("k");
+
+        //Make sprite
+        var fishTexture = resources.fish.texture;
+        fish = new PIXI.Sprite(fishTexture);
+        fish.anchor.set(0, 0.5);
+
+        //add sprite
+        app.stage.addChild(fish);
+
+        //Making pixi overlay from stage
+        pixiOverlay = L.pixiOverlay(function (utils, event) {
+          const container = utils.getContainer();
+          const renderer = utils.getRenderer();
+          const project = utils.latLngToLayerPoint;
+          const scale = utils.getScale();
+          const map = utils.getMap();
+
+          //initial velocity, position
+          if (firstDraw) {
+            fish.vx = 0;
+            fish.vy = 0;
+            var fishCoords = project(fishLatLng);
+            fish.x = fishCoords.x;
+            fish.y = fishCoords.y;
+            fish.scale.set(0.3 / scale);
+            firstDraw = false;
+          }
+
+          //"camera" (map) moves if player moves
+          if (event.type == "move") {
+            let newCoords = utils.layerPointToLatLng([fish.x, fish.y]);
+            map.panTo(newCoords);
+          }
+
+          renderer.render(container);
+
+        }, app.stage);
+
+        //Put pixi overlay on map
+        pixiOverlay.addTo(mymap);
+
+        //Left
+        left.press = () => {
+          console.log("left");
+          fish.vx = -1;
+          fish.vy = 0;
+        };
+        left.release = () => {
+          if (!right.isDown && fish.vy === 0) {
+            fish.vx = 0;
+          }
+        };
+
+        //Up
+        up.press = () => {
+          fish.vy = -1;
+          fish.vx = 0;
+        };
+        up.release = () => {
+          if (!down.isDown && fish.vx === 0) {
+            fish.vy = 0;
+          }
+        };
+
+        //Right
+        right.press = () => {
+          fish.vx = 1;
+          fish.vy = 0;
+        };
+        right.release = () => {
+          if (!left.isDown && fish.vy === 0) {
+            fish.vx = 0;
+          }
+        };
+
+        //Down
+        down.press = () => {
+          fish.vy = 1;
+          fish.vx = 0;
+        };
+        down.release = () => {
+          if (!up.isDown && fish.vx === 0) {
+            fish.vy = 0;
+          }
+        };
+
+        //Set the game state
+        state = play;
+
+        //Start the game loop
+        app.ticker.add((delta) => gameLoop(delta));
+      }
+
+      function gameLoop(delta) {
+        //Update the current game state:
+        state(delta);
+      }
+
+      function play(delta) {
+        let previousX = fish.x;
+        let previousY = fish.y;
+        //Use the fish's velocity to make it move
+        fish.x += fish.vx;
+        fish.y += fish.vy;
+
+        if (previousX != fish.x || previousY != fish.y) {
+          //redraw pixi overlay
+          pixiOverlay.redraw({ type: "move" });
+        }
+      }
+
+      //keyboard function
+      function keyboard(value) {
+        let key = {};
+        key.value = value;
+        key.isDown = false;
+        key.isUp = true;
+        key.press = undefined;
+        key.release = undefined;
+        //The `downHandler`
+        key.downHandler = (event) => {
+          if (event.key === key.value) {
+            if (key.isUp && key.press) key.press();
+            key.isDown = true;
+            key.isUp = false;
+            event.preventDefault();
+          }
+        };
+
+        //The `upHandler`
+        key.upHandler = (event) => {
+          if (event.key === key.value) {
+            if (key.isDown && key.release) key.release();
+            key.isDown = false;
+            key.isUp = true;
+            event.preventDefault();
+          }
+        };
+
+        //Attach event listeners
+        const downListener = key.downHandler.bind(key);
+        const upListener = key.upHandler.bind(key);
+
+        window.addEventListener("keydown", downListener, false);
+        window.addEventListener("keyup", upListener, false);
+
+        // Detach event listeners
+        key.unsubscribe = () => {
+          window.removeEventListener("keydown", downListener);
+          window.removeEventListener("keyup", upListener);
+        };
+
+        return key;
+      }
+    </script>
+  </body>
+</html>
