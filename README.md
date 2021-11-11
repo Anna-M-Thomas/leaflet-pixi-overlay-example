@@ -4,3 +4,5 @@ Simple example of a Pixi sprite that can move around on a Leaflet map using Leaf
 Download index.html, and enter your Mapbox access token at "put your access token in here"
 
 Open index.html and use j, i, k and l keys to move around!
+
+Uses CDN files for simplicity, see more complicated version with webpack at https://github.com/Anna-M-Thomas/carbon-busters 
